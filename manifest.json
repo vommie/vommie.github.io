@@ -1,0 +1,21 @@
+{
+    "name": "Music Practice",
+    "description": "App to practice keys and chords",
+    "start_url": "/",
+    "lang": "en-US",
+    "theme_color": "#ffffff",
+    "display": "fullscreen",
+    "orientation": "landscape",
+    "icons": [
+      {
+        "src": "android-chrome-192x192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "android-chrome-512x512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  }

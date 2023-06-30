@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Music Practice</title>
+    <meta name="description" content="" />
+    <meta name="robots" content="noindex">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="stylesheet" type="text/css" href="css/style.css?ver=7" />
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Music Practice">
+    <meta name="apple-mobile-web-app-title" content="Music Practice">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="msapplication-navbutton-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="msapplication-starturl" content="/">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="msapplication-config" content="none"/>
+    <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png">
+</head>
+<body>
+    <div style="height:1000px;"></div>  <!-- Part of a hack to prevent browser from displaying the address bar -->
+    <section id="practice-keys">
+        <section class="practice-grid">
+            <div class="current-grid">
+                <div class="titles-grid">
+                    <div class="loop">Loop</div>
+                    <div class="tempo">Tempo</div>
+                    <div class="key">Key or Chord</div>
+                    <div class="dur">Duration</div>
+                </div>
+                <div class="info-grid">
+                    <div class="loop"><div><span class="current">-</span>&nbsp;/&nbsp;<span class="total">-</span></div></div>
+                    <div class="tempo">-</div>
+                    <div class="key">-</div>
+                    <div class="dur">-</div>
+                </div>
+                <div class="beats-grid">
+                </div>
+            </div>
+            <div class="next-grid">
+                <div class="titles-grid">
+                    <div class="controls">Controls</div>
+                    <div class="tempo">Next</div>
+                </div>
+                <div class="info-grid">
+                    <div class="controls">
+                        <div class="btn play-pause-btn">Play</div>
+                    </div>
+                    <div class="preview tempo">-</div>
+                    <div class="preview key">-</div>
+                    <div class="preview dur">-</div>
+                </div>
+            </div>
+            <audio class="audio4th" preload="auto">
+                <source src="assets/audio/acoustic-kick.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+            <audio class="audiosubs" preload="auto">
+                <source src="assets/audio/drumsticks.wav" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+        </section>
+        <section class="key-settings-grid hidden">
+            <div class="group" data-key="C">
+                <div class="note">C</div>
+                <div class="accidentals">
+                    <div class="flat">♭</div>
+                    <div class="sharp">♯</div>
+                </div>
+            </div>
+            <div class="group" data-key="D">
+                <div class="note">D</div>
+                <div class="accidentals">
+                    <div class="flat">♭</div>
+                    <div class="sharp">♯</div>
+                </div>
+            </div>
+            <div class="group" data-key="E">
+                <div class="note">E</div>
+                <div class="accidentals">
+                    <div class="flat">♭</div>
+                    <div class="sharp">♯</div>
+                </div>
+            </div>
+            <div class="group" data-key="F">
+                <div class="note">F</div>
+                <div class="accidentals">
+                    <div class="flat">♭</div>
+                    <div class="sharp">♯</div>
+                </div>
+            </div>
+            <div class="group" data-key="G">
+                <div class="note">G</div>
+                <div class="accidentals">
+                    <div class="flat">♭</div>
+                    <div class="sharp">♯</div>
+                </div>
+            </div>
+            <div class="group" data-key="A">
+                <div class="note">A</div>
+                <div class="accidentals">
+                    <div class="flat">♭</div>
+                    <div class="sharp">♯</div>
+                </div>
+            </div>
+            <div class="group" data-key="B">
+                <div class="note">B</div>
+                <div class="accidentals">
+                    <div class="flat">♭</div>
+                    <div class="sharp">♯</div>
+                </div>
+            </div>
+            <div class="submenu">
+                <div class="close"><span>Close</span></div>
+                <div class="reset"><span>None</span></div>
+                <div class="all"><span>All</span></div>
+            </div>
+        </section>
+        <section class="dur-settings-grid hidden"></section>
+    </section>
+    <div style="height:1000px;"></div> <!-- Part of a hack to prevent browser from displaying the address bar -->
+    <script src="js/app.js?ver=7"></script>
+</body>
+</html>
