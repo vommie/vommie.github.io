@@ -206,7 +206,12 @@ html, body {
 }
 
 #practice-keys .play-pause-btn {
-    cursor: default
+    cursor: default;
+}
+
+#practice-keys .play-pause-btn.disabled {
+    cursor: default;
+    opacity: .2;
 }
 
 #practice-keys .sub-beats-grid > div {
@@ -215,7 +220,7 @@ html, body {
 
 #practice-keys .sub-beats-grid > div.active {
     background-color: #ef476f;
-    animation: beat-pulse .5s infinite;
+    /* animation: beat-pulse .5s infinite; */
     transition: all .3s;
 }
 
@@ -223,20 +228,42 @@ html, body {
     opacity: .4;
 }
 
+#practice-keys .next-grid .preview {
+    position: relative;
+}
+
 #practice-keys .next-grid .preview.old {
     opacity: .2;
 }
 
+#practice-keys .next-grid .preview.disabled {
+    opacity: .2;
+}
+
+#practice-keys .next-grid .preview.disabled:after {
+    position: absolute;
+    visibility: visible;
+    margin-top: 5px;
+    font-size: 2.5rem;
+    content: '🛇';
+    height: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: .6;
+    color: #ff0000;
+}
+
 #practice-keys .next-grid .preview:not(.old) {
-    animation: text-pulse 5s infinite;
+    /* animation: text-pulse 5s infinite; */
 }
 
 #practice-keys .next-grid .preview:not(.old) img {
-    animation: img-pulse 5s infinite;
+    /* animation: img-pulse 5s infinite; */
 }
 
 #practice-keys .current-grid .info-grid .error {
-    animation: text-error-pulse 1.1s 1;
+    /* animation: text-error-pulse 1.1s 1; */
 }
 
 #practice-keys > .key-settings-grid .note {
@@ -266,8 +293,13 @@ html, body {
     padding-top: 2px;
 }
 
-#practice-keys > .key-settings-grid .active {
-    animation: text-pulse 1s infinite;
+#practice-keys > .key-settings-grid .group div:not(.accidentals) {
+    opacity: .4;
+}
+
+#practice-keys > .key-settings-grid .group div.active {
+    /* animation: text-pulse 1s infinite; */
+    opacity: 1;
 }
 
 #practice-keys > .key-settings-grid .note {
@@ -287,6 +319,7 @@ html, body {
     padding: 0 2px 0 0;
     text-align: left;
 }
+
 
 /* Other */
 

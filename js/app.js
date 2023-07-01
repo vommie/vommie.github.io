@@ -3,6 +3,7 @@ class PracticeKeys {
     constructor() {
         // User settings
         this.loopsTotal = localStorage.getItem('loopsTotal') ? parseInt(localStorage.getItem('loopsTotal')) : 2;
+        this.beatsTotal = localStorage.getItem('beatsTotal') ? parseInt(localStorage.getItem('beatsTotal')) : 16;
         this.tempoMin = localStorage.getItem('tempoMin') ? parseInt(localStorage.getItem('tempoMin')) : 70;
         this.tempoMax = localStorage.getItem('tempoMax') ? parseInt(localStorage.getItem('tempoMax')) : 120;
         if(this.tempoMin > this.tempoMax) this.tempoMin = this.tempoMax;
@@ -11,20 +12,25 @@ class PracticeKeys {
         this.keys = Array.isArray(JSON.parse(localStorage.getItem('keys'))) ? JSON.parse(localStorage.getItem('keys')) : [ 'C', 'E', 'G' ];
         this.durs = Array.isArray(JSON.parse(localStorage.getItem('durs'))) ? JSON.parse(localStorage.getItem('durs')) : [ 4, 8, 83, 16 ];
         this.fourths = localStorage.getItem('fourths') ? parseInt(localStorage.getItem('fourths')) : 4;
+        this.mode = localStorage.getItem('mode') ? localStorage.getItem('mode') : 'loops';
+        this.diceKey = localStorage.getItem('diceKey') ? JSON.parse(localStorage.getItem('diceKey')) : true;
+        this.diceTempo = localStorage.getItem('diceTempo') ? JSON.parse(localStorage.getItem('diceTempo')) : true;
+        this.diceDur = localStorage.getItem('diceDur') ? JSON.parse(localStorage.getItem('diceDur')) : true;
         // Internal settings
         this.randomTempoThreshold = 10; // Only if the difference between min and max tempo is higher than this integer, a random tempo change will be generated
         // State members
         this.firstRun = true;
-        this.loopCurrent = 0;
+        this.counterCurrent = 0;
         this.tempoCurrent = 0;
         this.beatCurrent = 0;
+        this.beatsChange = 0;
         this.beatsMax = 0;
         this.beat4th = 0;
         this.playState = 0;
         this.metronomeInterval;
         this.keysPlayed = []
-        this.keyCurrent = false;
-        this.durCurrent = false;
+        this.keyCurrent = 0;
+        this.durCurrent = 0;
         this.moveStartY = false;
         this.moveIsThrottled = false;
         this.touchX = false;
@@ -41,21 +47,20 @@ class PracticeKeys {
             }
         }
 
-        this.updateScale();
         this.setEventListeners();
-
-        this.updateLoopCurrent(true)
-        this.updateLoopTotal(this.loopsTotal);
-        this.updateNext();
+        this.updateScale();
+        this.updateMode();
+        this.updateDices();
     }
 
     getElements() {
         let elements = {
             'practiceKeys': document.getElementById('practice-keys'),
-            'loop': document.querySelector('#practice-keys .current-grid .info-grid .loop'),
+            'counter': document.querySelector('#practice-keys .current-grid .info-grid .counter'),
+            'counterTitle': document.querySelector('#practice-keys .current-grid .titles-grid .counter'),
             'tempo': document.querySelector('#practice-keys .current-grid .info-grid .tempo'),
-            'loopsCurrent': document.querySelector('#practice-keys .current-grid .info-grid .loop .current'),
-            'loopsTotal': document.querySelector('#practice-keys .current-grid .info-grid .loop .total'),
+            'counterCurrent': document.querySelector('#practice-keys .current-grid .info-grid .counter .current'),
+            'counterTotal': document.querySelector('#practice-keys .current-grid .info-grid .counter .total'),
             'tempoCurrent': document.querySelector('#practice-keys .current-grid .info-grid .tempo'),
             'keyCurrent': document.querySelector('#practice-keys .current-grid .info-grid .key'),
             'durCurrent': document.querySelector('#practice-keys .current-grid .info-grid .dur'),
@@ -73,15 +78,20 @@ class PracticeKeys {
             'keySettingsResetBtn': document.querySelector('#practice-keys > .key-settings-grid .reset'),
             'keySettingsAllBtn': document.querySelector('#practice-keys > .key-settings-grid .all'),
             'keyGroups': document.querySelectorAll('#practice-keys > .key-settings-grid .group'),
+            'previewKey': document.querySelector('#practice-keys .next-grid .preview.key'),
+            'previewTempo': document.querySelector('#practice-keys .next-grid .preview.tempo'),
+            'previewDur': document.querySelector('#practice-keys .next-grid .preview.dur'),
         }
         return elements;
     }
 
     setEventListeners() {
         this.elements.playPauseBtn.addEventListener('click', e => this.onPlayPauseBtnClick(e));
-        // User change number total loops
-        this.elements.loop.addEventListener('touchstart', e => { this.moveStartY = e.touches[0].pageY; });
-        this.elements.loop.addEventListener('touchmove', e => this.onLoopTouchMove(e));
+        // User swap loops with beats
+        this.elements.counter.addEventListener('click', e => this.onCounterClick(e));
+        // User change number total loops or beats
+        this.elements.counter.addEventListener('touchstart', e => { this.moveStartY = e.touches[0].pageY; });
+        this.elements.counter.addEventListener('touchmove', e => this.onCounterTouchMove(e));
         // User change tempo min/max
         this.elements.tempo.addEventListener('touchstart', e => {
             this.moveStartY = e.touches[0].pageY;
@@ -102,6 +112,10 @@ class PracticeKeys {
         // Block user from scrolling.
         this.elements.practiceGrid.addEventListener('wheel', function(e) { e.preventDefault(); }, { passive: false });
         this.elements.practiceGrid.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
+        // User enable/disable dice options
+        this.elements.previewKey.addEventListener('click', e => this.onPreviewKeyClick(e));
+        this.elements.previewTempo.addEventListener('click', e => this.onPreviewTempoClick(e));
+        this.elements.previewDur.addEventListener('click', e => this.onPreviewDurClick(e));
         // Other
         window.addEventListener('resize', () => { this.updateScale(); });
     }
@@ -111,13 +125,20 @@ class PracticeKeys {
         else this.stop();
     }
 
-    onLoopTouchMove(e) {
+    onCounterTouchMove(e) {
         if(!this.moveIsThrottled) {
             this.moveIsThrottled = true;
             setTimeout(() => { this.moveIsThrottled = false; }, 250);
             let moveEndY = e.touches[0].pageY;
-            moveEndY - this.moveStartY > 0 ? this.updateLoopsTotalChange(-1) : this.updateLoopsTotalChange(1);
+            let change = 0;
+            moveEndY - this.moveStartY > 0 ? change = -1 : change = 1;
+            this.updateCounterTotalChange(change, this.mode == 'loops' ? false : true);
         }
+    }
+
+    onCounterClick(e) {
+        this.mode = this.mode == 'loops' ? 'beats' : 'loops';
+        this.updateMode();
     }
 
     onTempoTouchMove(e) {
@@ -201,6 +222,24 @@ class PracticeKeys {
         }
     }
 
+    onPreviewKeyClick(e) {
+        this.diceKey = this.diceKey ? false : true;
+        localStorage.setItem('diceKey', JSON.stringify(this.diceKey));
+        this.updateDices();
+    }
+
+    onPreviewTempoClick(e) {
+        this.diceTempo = this.diceTempo ? false : true;
+        localStorage.setItem('diceTempo', JSON.stringify(this.diceTempo));
+        this.updateDices();
+    }
+
+    onPreviewDurClick(e) {
+        this.diceDur = this.diceDur ? false : true;
+        localStorage.setItem('diceDur', JSON.stringify(this.diceDur));
+        this.updateDices();
+    }
+
     updateTempoChange(type, num) {
         clearTimeout(this.tempoChangeTimeout);
         this.tempoChangeTimeout = setTimeout(()=>{
@@ -259,72 +298,63 @@ class PracticeKeys {
         clearInterval(this.metronomeInterval);
         this.setLastBeatInactive();
         this.beatCurrent = 0;
+        if(this.beatsChange != 0) this.updateCounterTotalChange(this.beatsChange);
         this.elements.beatLastActive = false;
         this.elements.beatsGrid.innerHTML = '';
+        this.updateCounterCurrent(true);
     }
 
     updateNext(force=false) {
-        let tempo = this.tempoCurrent;
-        let i = 0;
-        if(this.tempoMin != this.tempoMax && this.tempoMax - this.tempoMin > this.randomTempoThreshold) {
-            i = 0;
-            while(Math.abs(this.tempoCurrent - tempo) <= this.randomTempoThreshold) {
-                tempo = this.getRandomTempo();
-                i++;
-                if(i > 50) break;
+        if(!this.firstRun && !this.diceKey && !this.diceTempo && !this.diceDur) return;
+        let tempo = this.firstRun ? this.getRandomTempo() : this.tempoCurrent;
+        if(this.diceTempo) {
+            if(this.tempoMin != this.tempoMax && this.tempoMax - this.tempoMin > this.randomTempoThreshold) {
+                for(let i = 0; i < 50; i++) {
+                    tempo = this.getRandomTempo();
+                    if(Math.abs(this.tempoCurrent - tempo) >= this.randomTempoThreshold) break;
+                }
             }
-        }
-        else {
-            console.log('Tempo difference is too small to randomize it.')
-            tempo = this.getRandomTempo();
+            else {
+                console.log('Tempo difference is too small to randomize it.')
+                tempo = this.getRandomTempo();
+            }
         }
         let dur = this.durCurrent;
-        i = 0;
-        while(dur == this.durCurrent) {
-            dur = this.getRandomDur();
-            i++;
-            if(i >= 50) break;
-        }
-        let key = false;
-        if(this.keys.length > 0) {
-            i = 0;
-            while(!key) {
-                key = this.getNextUniqueKey(this.keys, this.keysPlayed)
-                this.keysPlayed = [];
-                i++;
-                if(i >= 50) break;
+        if(this.diceDur || this.firstRun) dur = this.getRandomDur();
+        let key = this.getNextUniqueKey(this.keys, this.keysPlayed);
+
+        // Build possible dices
+        let dices = []
+        if(this.diceKey && key != this.keyCurrent) dices.push(0);
+        if(this.diceTempo && tempo != this.tempoCurrent) dices.push(2);
+        if(this.diceDur && dur != this.durCurrent) dices.push(4);
+        if((this.diceKey && key != this.keyCurrent) && (this.diceDur && dur != this.durCurrent)) dices.push(1)
+        if((this.diceTempo && tempo != this.tempoCurrent) && (this.diceKey && this.diceKey && key != this.keyCurrent)) dices.push(3)
+        if(this.firstRun) this.next = { 'key': key, 'dur': dur, 'tempo': tempo };
+        else {
+            // Dice what should be next
+            let dice = dices[Math.floor(Math.random() * dices.length)];
+            if(force=='tempo' && tempo != this.tempoCurrent) dice = 2;
+            if(dice == 0) { // New key
+                this.next = { 'key': key, 'dur': this.durCurrent, 'tempo': this.tempoCurrent }
+                this.setNextOpacities(key == this.keyCurrent ? 0 : 1, 0, 0);
             }
-        }
-        else key = 'C';
-        if(!this.keyCurrent) this.keyCurrent = key;
-        if(!this.durCurrent) this.durCurrent = dur;
-        if(this.tempoCurrent == 0) this.tempoCurrent = tempo;
-        let dice = this.getRandomInt(0, 4);
-        if(dice == 0 && key == this.keyCurrent) dice = [1, 2, 3, 4][Math.floor(Math.random() * 4)];
-        if(dice == 2 && tempo == this.tempoCurrent) dice = [0, 1, 3, 4][Math.floor(Math.random() * 4)];
-        if(force=='tempo' && tempo != this.tempoCurrent) dice = 2;
-        if(dice == 0) { // New key
-            this.next = { 'key': key, 'dur': this.durCurrent, 'tempo': this.tempoCurrent }
-            this.setNextOpacities(key == this.keyCurrent ? 0 : 1, 0, 0);
-        }
-        else if(dice == 1) { // New key and dur
-            this.next = { 'key': key, 'dur': dur, 'tempo': this.tempoCurrent }
-            this.setNextOpacities(key == this.keyCurrent ? 0 : 1, 1, 0);
-        }
-        else if(dice == 2) { // New tempo
-            this.next = { 'key': this.keyCurrent, 'dur': this.durCurrent, 'tempo': tempo }
-            this.setNextOpacities(0, 0, tempo == this.tempoCurrent ? 0 : 1);
-            this.previewLoop = true;
-        }
-        else if(dice == 3) { // New tempo and key
-            this.next = { 'key': key, 'dur': this.durCurrent, 'tempo': tempo }
-            this.setNextOpacities(key == this.keyCurrent ? 0 : 1, 0, tempo == this.tempoCurrent ? 0 : 1);
-            this.previewLoop = true;
-        }
-        else if(dice == 4) { // New dur
-            this.next = { 'key': this.keyCurrent, 'dur': dur, 'tempo': this.tempoCurrent }
-            this.setNextOpacities(0, 1, 0);
-            this.previewLoop = true;
+            else if(dice == 1) { // New key and dur
+                this.next = { 'key': key, 'dur': dur, 'tempo': this.tempoCurrent }
+                this.setNextOpacities(key == this.keyCurrent ? 0 : 1, dur == this.durCurrent ? 0 : 1, 0);
+            }
+            else if(dice == 2) { // New tempo
+                this.next = { 'key': this.keyCurrent, 'dur': this.durCurrent, 'tempo': tempo }
+                this.setNextOpacities(0, 0, tempo == this.tempoCurrent ? 0 : 1);
+            }
+            else if(dice == 3) { // New tempo and key
+                this.next = { 'key': key, 'dur': this.durCurrent, 'tempo': tempo }
+                this.setNextOpacities(key == this.keyCurrent ? 0 : 1, 0, tempo == this.tempoCurrent ? 0 : 1);
+            }
+            else if(dice == 4) { // New dur
+                this.next = { 'key': this.keyCurrent, 'dur': dur, 'tempo': this.tempoCurrent }
+                this.setNextOpacities(0, 1, 0);
+            }
         }
         if(this.firstRun) this.setNextOpacities(1, 1, 1);
         this.firstRun = false;
@@ -351,7 +381,6 @@ class PracticeKeys {
     }
 
     updateBeatCurrent() {
-        this.beatCurrent = 0;
         let dur = this.durCurrent;
         if(dur==83) dur=12;
         let interval = ((1 / (this.tempoCurrent / 60)) * 1000) / (dur/4);
@@ -360,16 +389,19 @@ class PracticeKeys {
     }
 
     beatsInterval() {
-        if(this.beatCurrent >= this.beatsMax) {
+        if((this.mode=='loops' && this.beatCurrent >= this.beatsMax) || (this.mode=='beats' && this.beatCurrent >= this.beatsTotal)) {
             this.beatCurrent = 1;
-            this.updateLoopCurrent();
-            if(this.loopCurrent == 1) {
+            this.updateCounterCurrent();
+            if((this.mode == 'loops' && this.counterCurrent == 1) || this.mode=='beats') {
                 this.updateCurrentFromNext();
                 this.updateNext();
                 return;
             }
         }
-        else this.beatCurrent += 1;
+        else {
+            if(this.mode == 'beats') this.updateCounterCurrent();
+            this.beatCurrent += 1;
+        }
         this.setLastBeatInactive();
         let beatCurrentElement = this.elements.beatsGrid.querySelector(`.sub-beats-grid > div:nth-child(${this.beatCurrent})`);
         beatCurrentElement.classList.toggle('active');
@@ -399,23 +431,55 @@ class PracticeKeys {
         this.elements.audioSubs.play();
     }
 
-    updateLoopCurrent(reset=false) {
-        if(reset) this.loopCurrent = 1;
-        else if(this.loopCurrent >= this.loopsTotal) this.loopCurrent = 1;
-        else this.loopCurrent += 1;
-        this.elements.loopsCurrent.textContent = this.loopCurrent;
+    updateMode() {
+        if(this.playState) this.updateCurrentFromNext();
+        this.updateNext();
+        if(this.mode == 'loops') {
+            this.elements.counterTitle.textContent = 'Loops';
+            this.updateCounterTotal(this.loopsTotal);
+        }
+        else if(this.mode == 'beats') {
+            this.elements.counterTitle.textContent = 'Beats';
+            this.updateCounterTotal(this.beatsTotal);
+        }
+        localStorage.setItem('mode', this.mode);
     }
 
-    updateLoopTotal(loop) {
-        this.loopsTotal = loop;
-        this.elements.loopsTotal.textContent = loop;
-        localStorage.setItem('loopsTotal', this.loopsTotal);
+    updateCounterCurrent(reset=false) {
+        this.counterTotal = this.mode == 'loops' ? this.loopsTotal : this.beatsTotal;
+        if(reset) this.counterCurrent = this.mode == 'loops' ? 1 : 0;
+        else if(this.counterCurrent >= this.counterTotal) this.counterCurrent = 1;
+        else this.counterCurrent += 1;
+        this.elements.counterCurrent.textContent = this.counterCurrent;
     }
 
-    updateLoopsTotalChange(num) {
-        if(this.loopsTotal + num >= 1) this.loopsTotal += num;
-        this.elements.loopsTotal.textContent = this.loopsTotal;
-        localStorage.setItem('loopsTotal', this.loopsTotal);
+    updateCounterTotal(count) {
+        if(this.mode == 'loops') {
+            this.loopsTotal = count;
+            localStorage.setItem('loopsTotal', this.loopsTotal);
+        }
+        else if(this.mode == 'beats') {
+            this.beatsTotal = count;
+            localStorage.setItem('beatsTotal', this.beatsTotal);
+        }
+        this.elements.counterTotal.textContent = count;
+    }
+
+    updateCounterTotalChange(num, waitForNext=false) {
+        if(this.mode == 'loops') {
+            if(this.loopsTotal + num >= 1) this.loopsTotal += num;
+            this.elements.counterTotal.textContent = this.loopsTotal;
+            localStorage.setItem('loopsTotal', this.loopsTotal);
+        }
+        else if(this.mode == 'beats') {
+            if(waitForNext) this.beatsChange += num;
+            else if(this.beatsTotal + num >= 1) {
+                this.beatsTotal += num;
+                this.beatsChange = 0;
+            }
+            this.elements.counterTotal.textContent = this.beatsTotal + this.beatsChange;
+            localStorage.setItem('beatsTotal', this.beatsTotal);
+        }
     }
 
     updateKeyCurrent(key) {
@@ -463,7 +527,8 @@ class PracticeKeys {
         let subElement = document.createElement('div');
         subElement.classList.add('sub-beats-grid');
         let beatElements = '';
-        for(let i = 1; i <= this.fourths; i++) {
+        let fourths = this.mode == 'loops' ? this.fourths : this.calcFourthsFromBeats(dur);
+        for(let i = 1; i <= fourths; i++) {
             beatElements += `<div class="main">${i}</div>`;
             if(dur == 83) beatElements += '<div class="sub"></div>'.repeat(2);
             else beatElements += '<div class="sub"></div>'.repeat((dur / 4)-1);
@@ -472,14 +537,24 @@ class PracticeKeys {
         this.elements.beatsGrid.appendChild(subElement);
     }
 
+    calcFourthsFromBeats(dur) {
+        if(dur == 83) dur = 12;
+        let fourths = Math.ceil(this.beatsTotal * (4/dur));
+        return fourths;
+    }
+
     getNextUniqueKey(array1, array2) {
         // Gets a music key which was not already played since the last reset
         let filteredArray = array1.filter(function(item) {
             return array2.indexOf(item) === -1;
         });
-        if (filteredArray.length === 0) return false;
+        if (filteredArray.length === 0) {
+            this.keysPlayed = [];
+            return 'C';
+        }
         let randomIndex = Math.floor(Math.random() * filteredArray.length);
-        return filteredArray[randomIndex];
+        let key = filteredArray[randomIndex];
+        return key ? key : 'C';
     }
 
     getRandomInt(min, max) {
@@ -508,6 +583,24 @@ class PracticeKeys {
         this.elements.practiceKeys.style.transform = 'scale(' + scale + ')';
 
         this.scrollToPractice();
+    }
+
+    updateDices() {
+        if(this.diceKey) this.elements.previewKey.classList.remove('disabled');
+        else {
+            this.elements.previewKey.classList.add('disabled')
+            if(this.keyCurrent != 0) this.next.key = this.keyCurrent;
+        }
+        if(this.diceTempo) this.elements.previewTempo.classList.remove('disabled');
+        else {
+            this.elements.previewTempo.classList.add('disabled')
+            if(this.tempoCurrent != 0) this.next.tempo = this.tempoCurrent;
+        }
+        if(this.diceDur) this.elements.previewDur.classList.remove('disabled');
+        else {
+            this.elements.previewDur.classList.add('disabled')
+            if(this.durCurrent != 0) this.next.dur = this.durCurrent;
+        }
     }
 
     scrollToPractice() {
