@@ -243,8 +243,8 @@ html, body {
 #practice-keys .next-grid .preview.disabled:after {
     position: absolute;
     visibility: visible;
-    margin-top: 5px;
     font-size: 2.5rem;
+    line-height: 2.5rem;
     content: '🛇';
     height: auto;
     top: 50%;
