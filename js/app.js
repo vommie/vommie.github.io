@@ -1,6 +1,9 @@
 class PracticeKeys {
 
     constructor() {
+        // Internal settings
+        this.randomTempoThreshold = 10; // Only if the difference between min and max tempo is higher than this integer, a random tempo change will be generated
+        this.implementedDurs = [ 4, 8, 12, 16 ]
         // User settings
         this.loopsTotal = localStorage.getItem('loopsTotal') ? parseInt(localStorage.getItem('loopsTotal')) : 2;
         this.beatsTotal = localStorage.getItem('beatsTotal') ? parseInt(localStorage.getItem('beatsTotal')) : 16;
@@ -10,14 +13,13 @@ class PracticeKeys {
         else if(this.tempoMax < this.tempoMin) this.tempoMax = this.tempoMin;
         this.maxTempoIn4th = localStorage.getItem('maxTempoIn4th') ? parseInt(localStorage.getItem('maxTempoIn4th')) : 240;
         this.keys = Array.isArray(JSON.parse(localStorage.getItem('keys'))) ? JSON.parse(localStorage.getItem('keys')) : [ 'C', 'E', 'G' ];
-        this.durs = Array.isArray(JSON.parse(localStorage.getItem('durs'))) ? JSON.parse(localStorage.getItem('durs')) : [ 4, 8, 83, 16 ];
+        this.durs = Array.isArray(JSON.parse(localStorage.getItem('durs'))) ? JSON.parse(localStorage.getItem('durs')) : this.implementedDurs;
         this.fourths = localStorage.getItem('fourths') ? parseInt(localStorage.getItem('fourths')) : 4;
         this.mode = localStorage.getItem('mode') ? localStorage.getItem('mode') : 'loops';
         this.diceKey = localStorage.getItem('diceKey') ? JSON.parse(localStorage.getItem('diceKey')) : true;
         this.diceTempo = localStorage.getItem('diceTempo') ? JSON.parse(localStorage.getItem('diceTempo')) : true;
         this.diceDur = localStorage.getItem('diceDur') ? JSON.parse(localStorage.getItem('diceDur')) : true;
-        // Internal settings
-        this.randomTempoThreshold = 10; // Only if the difference between min and max tempo is higher than this integer, a random tempo change will be generated
+        this.beatsCache = JSON.parse(localStorage.getItem('beatsCache')) ? JSON.parse(localStorage.getItem('beatsCache')) : {};
         // State members
         this.firstRun = true;
         this.counterCurrent = 0;
@@ -38,15 +40,9 @@ class PracticeKeys {
         this.tempoChangeTimeout = false;
         this.elements = this.getElements();
         this.next = {}
-        this.assets = {
-            'notes': {
-                '4': 'assets/note_4.svg',
-                '8': 'assets/note_8.svg',
-                '83': 'assets/note_8_triad.svg', // 8th triad
-                '16': 'assets/note_16.svg',
-            }
-        }
 
+        this.insertSubBeatsFromCache();
+        this.buildDurSettings();
         this.setEventListeners();
         this.updateScale();
         this.updateMode();
@@ -78,6 +74,7 @@ class PracticeKeys {
             'keySettingsResetBtn': document.querySelector('#practice-keys > .key-settings-grid .reset'),
             'keySettingsAllBtn': document.querySelector('#practice-keys > .key-settings-grid .all'),
             'keyGroups': document.querySelectorAll('#practice-keys > .key-settings-grid .group'),
+            'durSettingsGrid': document.querySelector('#practice-keys > .dur-settings-grid'),
             'previewKey': document.querySelector('#practice-keys .next-grid .preview.key'),
             'previewTempo': document.querySelector('#practice-keys .next-grid .preview.tempo'),
             'previewDur': document.querySelector('#practice-keys .next-grid .preview.dur'),
@@ -109,6 +106,8 @@ class PracticeKeys {
                 element.addEventListener('click', e => this.onKeyClick(e));
             });
         });
+        // User selection for durations
+        this.elements.durCurrent.addEventListener('click', e => this.onDurCurrentClick(e));
         // Block user from scrolling.
         this.elements.practiceGrid.addEventListener('wheel', function(e) { e.preventDefault(); }, { passive: false });
         this.elements.practiceGrid.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
@@ -182,7 +181,7 @@ class PracticeKeys {
         });
         this.elements.practiceGrid.classList.remove('hidden');
         localStorage.setItem('keys', JSON.stringify(this.keys));
-        this.updateNext();
+        this.updateNext('key');
     }
 
     onKeySettingsResetBtn(e) {
@@ -218,6 +217,63 @@ class PracticeKeys {
         }
         else {
             this.keys.push(clickedKey);
+            element.classList.add('active');
+        }
+    }
+
+    onDurCurrentClick(e) {
+        // Set active states
+        this.elements.durSettingsGrid.querySelectorAll('.active').forEach(element=>{ element.classList.remove('active'); });
+        this.elements.durOptions.forEach(option=>{
+            this.durs.forEach(dur=>{
+                if(dur==parseInt(option.dataset.dur)) option.classList.add('active');
+            });
+        });
+        // Show screen
+        this.elements.practiceKeys.childNodes.forEach(node=>{
+            try { node.classList.add('hidden'); }
+            catch {}
+        });
+        this.elements.durSettingsGrid.classList.remove('hidden');
+    }
+
+    onDurSettingsCloseBtn(e) {
+        this.elements.practiceKeys.childNodes.forEach(node=>{
+            try { node.classList.add('hidden'); }
+            catch {}
+        });
+        this.elements.practiceGrid.classList.remove('hidden');
+        if(this.durs.length == 0) this.durs = [ 4 ];
+        localStorage.setItem('durs', JSON.stringify(this.durs));
+        this.updateNext('dur');
+    }
+
+    onDurSettingsResetBtn(e) {
+        this.elements.durSettingsGrid.querySelectorAll('.active').forEach(element=>{
+            element.classList.remove('active');
+        });
+        this.durs = [];
+    }
+
+    onDurSettingsAllBtn(e) {
+        let durs = [];
+        this.elements.durOptions.forEach(option=>{
+            let dur = parseInt(option.dataset.dur);
+            durs.push(dur);
+            option.classList.add('active');
+        });
+        this.durs = durs;
+    }
+
+    onDurOptionClick(e) {
+        let element = e.currentTarget;
+        let dur = parseInt(element.dataset.dur);
+        if(this.durs.includes(dur)) {
+            this.durs = this.durs.filter(item => item !== dur);
+            element.classList.remove('active');
+        }
+        else {
+            this.durs.push(dur);
             element.classList.add('active');
         }
     }
@@ -300,7 +356,6 @@ class PracticeKeys {
         this.beatCurrent = 0;
         if(this.beatsChange != 0) this.updateCounterTotalChange(this.beatsChange);
         this.elements.beatLastActive = false;
-        this.elements.beatsGrid.innerHTML = '';
         this.updateCounterCurrent(true);
     }
 
@@ -319,7 +374,10 @@ class PracticeKeys {
                 tempo = this.getRandomTempo();
             }
         }
-        let dur = this.durCurrent;
+        if(this.durCurrent == 0) this.durCurrent = 4
+        if(this.tempoCurrent == 0) this.tempoCurrent = this.getRandomTempo();
+        if(!this.keyCurrent)this.keyCurrent = 'C';
+        let dur =  this.durCurrent;
         if(this.diceDur || this.firstRun) dur = this.getRandomDur();
         let key = this.getNextUniqueKey(this.keys, this.keysPlayed);
 
@@ -335,7 +393,10 @@ class PracticeKeys {
             // Dice what should be next
             let dice = dices[Math.floor(Math.random() * dices.length)];
             if(force=='tempo' && tempo != this.tempoCurrent) dice = 2;
+            else if(force=='dur' && dur != this.tempoCurrent) dice = 4;
+            else if(force=='key' && key != this.keyCurrent) dice = 0;
             if(dice == 0) { // New key
+                if(force=='key' && this.keys.includes(this.keyCurrent)) key = this.keyCurrent;
                 this.next = { 'key': key, 'dur': this.durCurrent, 'tempo': this.tempoCurrent }
                 this.setNextOpacities(key == this.keyCurrent ? 0 : 1, 0, 0);
             }
@@ -352,6 +413,7 @@ class PracticeKeys {
                 this.setNextOpacities(key == this.keyCurrent ? 0 : 1, 0, tempo == this.tempoCurrent ? 0 : 1);
             }
             else if(dice == 4) { // New dur
+                if(force=='dur' && this.durs.includes(this.durCurrent)) dur = this.durCurrent;
                 this.next = { 'key': this.keyCurrent, 'dur': dur, 'tempo': this.tempoCurrent }
                 this.setNextOpacities(0, 1, 0);
             }
@@ -382,7 +444,6 @@ class PracticeKeys {
 
     updateBeatCurrent() {
         let dur = this.durCurrent;
-        if(dur==83) dur=12;
         let interval = ((1 / (this.tempoCurrent / 60)) * 1000) / (dur/4);
         this.beatsInterval();
         this.metronomeInterval = setInterval(() => this.beatsInterval(), interval)
@@ -403,7 +464,8 @@ class PracticeKeys {
             this.beatCurrent += 1;
         }
         this.setLastBeatInactive();
-        let beatCurrentElement = this.elements.beatsGrid.querySelector(`.sub-beats-grid > div:nth-child(${this.beatCurrent})`);
+        let dataKey = this.mode == 'loops' ? `${this.fourths}${this.durCurrent}` : `${this.calcFourthsFromBeats(this.durCurrent)}${this.durCurrent}`;
+        let beatCurrentElement = this.elements.beatsGrid.querySelector(`.sub-beats-grid[data-key="${dataKey}"] > div:nth-child(${this.beatCurrent})`);
         beatCurrentElement.classList.toggle('active');
         if(this.durCurrent == 4) this.playAudio4th()
         else if(this.beatCurrent % this.beat4th-1 == 0) this.playAudio4th();
@@ -496,22 +558,12 @@ class PracticeKeys {
         this.durCurrent = dur;
         this.beatsMax = (dur/4)*this.fourths
         this.beat4th = dur/4
-        if(dur == 83) {
-            this.beatsMax = this.fourths * 3
-            this.beat4th = 3
-        }
-        let imgSrc = this.assets.notes[String(dur)];
-        this.elements.durCurrent.innerHTML = `
-            <img src="${imgSrc}">
-        `;
+        this.elements.durCurrent.innerHTML = `<img src="assets/note_${dur}.svg">`;
         this.updateBeatsGrid(dur);
     }
 
     updateDurNext(dur) {
-        let imgSrc = this.assets.notes[String(dur)];
-        this.elements.durNext.innerHTML = `
-            <img src="${imgSrc}">
-        `;
+        this.elements.durNext.innerHTML = `<img src="assets/note_${dur}.svg">`;
     }
 
     updateTempoCurrent(tempo) {
@@ -524,21 +576,50 @@ class PracticeKeys {
     }
 
     updateBeatsGrid(dur) {
-        let subElement = document.createElement('div');
-        subElement.classList.add('sub-beats-grid');
-        let beatElements = '';
         let fourths = this.mode == 'loops' ? this.fourths : this.calcFourthsFromBeats(dur);
-        for(let i = 1; i <= fourths; i++) {
-            beatElements += `<div class="main">${i}</div>`;
-            if(dur == 83) beatElements += '<div class="sub"></div>'.repeat(2);
-            else beatElements += '<div class="sub"></div>'.repeat((dur / 4)-1);
+        let beatsCacheKey = `${fourths}${dur}`;
+        let subElement;
+        if(this.beatsCache[beatsCacheKey] == undefined) {
+            subElement = document.createElement('div');
+            subElement.classList.add('sub-beats-grid');
+            subElement.dataset['key'] = beatsCacheKey;
+            let beatElements = '';
+            for(let i = 1; i <= fourths; i++) {
+                beatElements += `<div class="main">${i}</div>`;
+                // if(dur == 12) beatElements += '<div class="sub"></div>'.repeat(2);
+                // else beatElements += '<div class="sub"></div>'.repeat((dur / 4)-1);
+                beatElements += '<div class="sub"></div>'.repeat((dur / 4)-1);
+            }
+            subElement.innerHTML = beatElements;
+            this.beatsCache[beatsCacheKey] = {
+                'classList': subElement.classList.toString(),
+                'innerHTML': subElement.innerHTML,
+            }
+            localStorage.setItem('beatsCache', JSON.stringify(this.beatsCache));
+            this.elements.beatsGrid.appendChild(subElement);
         }
-        subElement.innerHTML = beatElements;
-        this.elements.beatsGrid.appendChild(subElement);
+        this.elements.beatsGrid.querySelectorAll('.sub-beats-grid').forEach(element=>{
+            if(element.dataset.key == beatsCacheKey) element.classList.remove('hidden');
+            else element.classList.add('hidden');
+        });
+    }
+
+    insertSubBeatsFromCache() {
+        if(this.beatsCache) {
+            for(let key in this.beatsCache) {
+                if(this.beatsCache.hasOwnProperty(key)) {
+                    let subElement = document.createElement('div');
+                    subElement.classList.add(this.beatsCache[key].classList);
+                    subElement.classList.add('hidden');
+                    subElement.innerHTML = this.beatsCache[key].innerHTML;
+                    subElement.dataset.key = key;
+                    this.elements.beatsGrid.appendChild(subElement)
+                }
+            }
+        }
     }
 
     calcFourthsFromBeats(dur) {
-        if(dur == 83) dur = 12;
         let fourths = Math.ceil(this.beatsTotal * (4/dur));
         return fourths;
     }
@@ -548,9 +629,9 @@ class PracticeKeys {
         let filteredArray = array1.filter(function(item) {
             return array2.indexOf(item) === -1;
         });
-        if (filteredArray.length === 0) {
+        if(filteredArray.length === 0) {
             this.keysPlayed = [];
-            return 'C';
+            return this.keys.length == 0 ? 'C' : this.keys[0];
         }
         let randomIndex = Math.floor(Math.random() * filteredArray.length);
         let key = filteredArray[randomIndex];
@@ -601,6 +682,24 @@ class PracticeKeys {
             this.elements.previewDur.classList.add('disabled')
             if(this.durCurrent != 0) this.next.dur = this.durCurrent;
         }
+    }
+
+    buildDurSettings() {
+        let menu = this.elements.durSettingsGrid.querySelector('.submenu');
+        let menuClone = menu.cloneNode(true);
+        menu.remove();
+        this.implementedDurs.forEach(dur=>{
+            let div = document.createElement('div');
+            div.dataset.dur = dur;
+            div.innerHTML = `<img src="assets/note_${dur}.svg">`;
+            div.addEventListener('click', e => this.onDurOptionClick(e));
+            this.elements.durSettingsGrid.appendChild(div);
+        });
+        this.elements.durSettingsGrid.appendChild(menuClone);
+        if(!this.elements.durOptions) this.elements.durOptions = this.elements.durSettingsGrid.querySelectorAll('[data-dur]');
+        document.querySelector('#practice-keys > .dur-settings-grid .close').addEventListener('click', e => this.onDurSettingsCloseBtn(e));
+        document.querySelector('#practice-keys > .dur-settings-grid .reset').addEventListener('click', e => this.onDurSettingsResetBtn(e));
+        document.querySelector('#practice-keys > .dur-settings-grid .all').addEventListener('click', e => this.onDurSettingsAllBtn(e));
     }
 
     scrollToPractice() {

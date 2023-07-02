@@ -63,14 +63,6 @@
                     <div class="preview dur">-</div>
                 </div>
             </div>
-            <audio class="audio4th" preload="auto">
-                <source src="assets/audio/acoustic-kick.wav" type="audio/wav">
-                Your browser does not support the audio element.
-            </audio>
-            <audio class="audiosubs" preload="auto">
-                <source src="assets/audio/drumsticks.wav" type="audio/wav">
-                Your browser does not support the audio element.
-            </audio>
         </section>
         <section class="key-settings-grid hidden">
             <div class="group" data-key="C">
@@ -128,7 +120,19 @@
                 <div class="all"><span>All</span></div>
             </div>
         </section>
-        <section class="dur-settings-grid hidden"></section>
+        <section class="dur-settings-grid hidden">
+            <div class="submenu">
+                <div class="close"><span>Close</span></div>
+                <div class="reset"><span>None</span></div>
+                <div class="all"><span>All</span></div>
+            </div>
+        </section>
+        <audio class="audio4th hidden" preload="auto">
+            <source src="assets/audio/acoustic-kick.wav" type="audio/wav">
+        </audio>
+        <audio class="audiosubs hidden" preload="auto">
+            <source src="assets/audio/drumsticks.wav" type="audio/wav">
+        </audio>
     </section>
     <div style="height:1000px;"></div> <!-- Part of a hack to prevent browser from displaying the address bar -->
     <script src="js/app.js?ver=7"></script>
